@@ -90,21 +90,26 @@
     </div>`;
   root.insertAdjacentHTML("beforeend", html);
 
-  // Behavior
-  const SEND_POLICY = "immediate"; // or 'bot-first'
+  // --- Behavior/state ---
+  const SEND_POLICY = "bot-first"; // keep order: Agent joined → welcome → your message
   let chatLaunched = false;
+  let launchPromise = null;        // guard for duplicate launches
   let pendingMessage = null;
+  let busy = false;                // disables UI during launch/send
 
   const container = document.getElementById("piperContainer");
   const pills = container.querySelectorAll(".piper-pill");
   const input = document.getElementById("piperInput");
   const sendBtn = document.getElementById("piperSendBtn");
 
-  function hideCard() {
-    container && container.classList.add("piper-hidden");
-  }
-  function showCard() {
-    container && container.classList.remove("piper-hidden");
+  function hideCard() { container && container.classList.add("piper-hidden"); }
+  function showCard() { container && container.classList.remove("piper-hidden"); }
+
+  function setDisabled(disabled) {
+    busy = disabled;
+    pills.forEach(b => (b.disabled = disabled));
+    sendBtn.disabled = disabled;
+    input.disabled = disabled;
   }
 
   // Wait for utilAPI made available by your existing assets/app.js init
@@ -120,13 +125,42 @@
     });
   }
 
+  // Wait until the bot posts its first message, or timeout.
+  function waitForFirstBotMessage(timeoutMs = 12000) {
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = (tag) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(to);
+        window.removeEventListener("onEmbeddedMessagingFirstBotMessageSent", onBot);
+        window.removeEventListener("onEmbeddedMessagingConversationStarted", onStart);
+        resolve(tag);
+      };
+      const onBot = () => finish("bot-first");
+      const onStart = () => finish("started"); // if no welcome is configured
+      window.addEventListener("onEmbeddedMessagingFirstBotMessageSent", onBot, { once: true });
+      window.addEventListener("onEmbeddedMessagingConversationStarted", onStart, { once: true });
+      const to = setTimeout(() => finish("timeout"), timeoutMs);
+    });
+  }
+
   async function launchChatIfNeeded() {
     await waitForUtilAPI();
-    if (!chatLaunched) {
-      await embeddedservice_bootstrap.utilAPI.launchChat();
-      chatLaunched = true;
-      hideCard(); // hide custom UI after launcher
+    if (chatLaunched) return;
+    if (!launchPromise) {
+      launchPromise = embeddedservice_bootstrap.utilAPI
+        .launchChat()
+        .then(() => {
+          chatLaunched = true;
+          hideCard();  // hide custom UI after launcher opens
+        })
+        .catch((e) => {
+          launchPromise = null;
+          throw e;
+        });
     }
+    await launchPromise;
   }
 
   function sendTextNow(text) {
@@ -134,55 +168,48 @@
     return embeddedservice_bootstrap.utilAPI.sendTextMessage(text.trim());
   }
 
-  // Optional 'bot-first' queueing
-  window.addEventListener("onEmbeddedMessagingFirstBotMessageSent", () => {
-    if (SEND_POLICY === "bot-first" && pendingMessage) {
-      sendTextNow(pendingMessage);
-      pendingMessage = null;
-    }
-  });
-  window.addEventListener("onEmbeddedMessagingConversationStarted", () => {
-    if (SEND_POLICY === "bot-first" && pendingMessage) {
-      sendTextNow(pendingMessage);
-      pendingMessage = null;
-    }
-  });
-
-  // CTAs
+  // CTA buttons
   pills.forEach((btn) => {
     btn.addEventListener("click", async () => {
+      if (busy) return;
       const msg = btn.dataset.msg;
       pendingMessage = msg;
+      setDisabled(true);
       try {
         await launchChatIfNeeded();
-        if (SEND_POLICY === "immediate") {
-          await sendTextNow(msg);
-          pendingMessage = null;
-        }
+        if (SEND_POLICY === "bot-first") await waitForFirstBotMessage();
+        await sendTextNow(msg);
+        pendingMessage = null;
       } catch (e) {
         console.warn("Launch/send failed:", e);
         showCard();
+      } finally {
+        setDisabled(false);
       }
     });
   });
 
   // Input send
   sendBtn.addEventListener("click", async () => {
+    if (busy) return;
     const msg = input.value;
     if (!msg.trim()) return;
     pendingMessage = msg;
+    setDisabled(true);
     try {
       await launchChatIfNeeded();
-      if (SEND_POLICY === "immediate") {
-        await sendTextNow(msg);
-        pendingMessage = null;
-      }
+      if (SEND_POLICY === "bot-first") await waitForFirstBotMessage();
+      await sendTextNow(msg);
+      pendingMessage = null;
       input.value = "";
     } catch (e) {
       console.warn("Launch/send failed:", e);
       showCard();
+    } finally {
+      setDisabled(false);
     }
   });
+
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -190,6 +217,16 @@
     }
   });
 
-  // If your org emits an end/minimize event, uncomment to re-show:
-  // window.addEventListener("onEmbeddedMessagingConversationEnded", showCard);
+  // Keep Piper hidden while chat is open; show when minimized/closed/ended
+  window.addEventListener("onEmbeddedMessagingExpanded", hideCard);
+  window.addEventListener("onEmbeddedMessagingMinimized", showCard);
+
+  ["onEmbeddedMessagingConversationEnded", "onEmbeddedMessagingClosed"].forEach((evt) => {
+    window.addEventListener(evt, () => {
+      // Allow a new fresh session next time
+      chatLaunched = false;
+      launchPromise = null;
+      showCard();
+    });
+  });
 })();
