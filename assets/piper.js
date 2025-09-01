@@ -3,10 +3,10 @@
   // --- Localized strings ---
   const L10N = {
     en: {
-      name: "Piper",
+      name: "Algolia AI",
       role: "AI SDR Agent",
       greeting:
-        "Hey there! I’m Piper, your friendly AI SDR agent. What can I help you with today?",
+        "Hey there! I’m Algolia AI, your friendly AI SDR agent. What can I help you with today?",
       btn1: "Schedule a Demo",
       btn2: "Chat with Our Team",
       placeholder: "Ask a question",
@@ -14,10 +14,10 @@
         'This conversation may be recorded and used per our <a href="#">Privacy Policy</a>.',
     },
     de: {
-      name: "Piper",
+      name: "Algolia AI",
       role: "KI-SDR-Agentin",
       greeting:
-        "Hallo! Ich bin Piper, deine freundliche KI-SDR-Agentin. Wobei kann ich dir heute helfen?",
+        "Hallo! Ich bin Algolia AI, deine freundliche KI-SDR-Agentin. Wobei kann ich dir heute helfen?",
       btn1: "Demo vereinbaren",
       btn2: "Mit unserem Team chatten",
       placeholder: "Stelle eine Frage",
@@ -25,10 +25,10 @@
         'Dieses Gespräch kann aufgezeichnet und gemäß unserer <a href="#">Datenschutzerklärung</a> verwendet werden.',
     },
     fr: {
-      name: "Piper",
+      name: "Algolia AI",
       role: "Agent SDR IA",
       greeting:
-        "Bonjour ! Je suis Piper, votre agent SDR IA. Comment puis-je vous aider aujourd’hui ?",
+        "Bonjour ! Je suis Algolia AI, votre agent SDR IA. Comment puis-je vous aider aujourd’hui ?",
       btn1: "Planifier une démo",
       btn2: "Discuter avec notre équipe",
       placeholder: "Posez une question",
@@ -61,7 +61,7 @@
     document.body.appendChild(root);
   }
 
-  // Piper card UI
+  // Card UI
   const html = `
     <div class="piper-container" id="piperContainer">
       <div class="piper-card" id="piperCard">
@@ -91,11 +91,11 @@
   root.insertAdjacentHTML("beforeend", html);
 
   // --- Behavior/state ---
-  const SEND_POLICY = "bot-first"; // keep order: Agent joined → welcome → your message
+  const SEND_POLICY = "bot-first";  // keep order: Agent joined → welcome → your message
   let chatLaunched = false;
-  let launchPromise = null;        // guard for duplicate launches
+  let launchPromise = null;         // guard duplicate launches
   let pendingMessage = null;
-  let busy = false;                // disables UI during launch/send
+  let busy = false;                 // disables UI during launch/send
 
   const container = document.getElementById("piperContainer");
   const pills = container.querySelectorAll(".piper-pill");
@@ -112,7 +112,7 @@
     input.disabled = disabled;
   }
 
-  // Wait for utilAPI made available by your existing assets/app.js init
+  // Wait for utilAPI provided by assets/app.js
   function waitForUtilAPI(timeoutMs = 10000) {
     return new Promise((resolve, reject) => {
       const start = Date.now();
@@ -125,7 +125,7 @@
     });
   }
 
-  // Wait until the bot posts its first message, or timeout.
+  // Wait until bot posts first message, or timeout.
   function waitForFirstBotMessage(timeoutMs = 12000) {
     return new Promise((resolve) => {
       let settled = false;
@@ -153,7 +153,7 @@
         .launchChat()
         .then(() => {
           chatLaunched = true;
-          hideCard();  // hide custom UI after launcher opens
+          hideCard(); // hide custom UI after launcher opens
         })
         .catch((e) => {
           launchPromise = null;
@@ -217,13 +217,52 @@
     }
   });
 
-  // Keep Piper hidden while chat is open; show when minimized/closed/ended
+  // Keep card hidden while chat is open; show when minimized/closed/ended
   window.addEventListener("onEmbeddedMessagingExpanded", hideCard);
   window.addEventListener("onEmbeddedMessagingMinimized", showCard);
-
   ["onEmbeddedMessagingConversationEnded", "onEmbeddedMessagingClosed"].forEach((evt) => {
     window.addEventListener(evt, () => {
-      // Allow a new fresh session next time
+      chatLaunched = false;      // allow a fresh session next time
+      launchPromise = null;
+      showCard();
+    });
+  });
+
+  // --- Force-hide Salesforce's default launcher whenever it appears ---
+  function hideDefaultLauncher() {
+    try {
+      const selectors = [
+        ".embeddedservice-helpbutton",
+        ".embeddedservice-helpbutton .helpButton",
+        ".embeddedMessagingLauncher",
+        ".embeddedMessaging .embeddedMessagingLauncher",
+        'iframe[id^="snapins_launcher"]',
+        'iframe[id*="launcher"]',
+        'iframe[name*="launcher"]'
+      ];
+      document.querySelectorAll(selectors.join(",")).forEach((el) => {
+        el.style.setProperty("display", "none", "important");
+        el.style.setProperty("visibility", "hidden", "important");
+        el.style.setProperty("opacity", "0", "important");
+        el.setAttribute("aria-hidden", "true");
+        el.setAttribute("tabindex", "-1");
+      });
+    } catch (e) {
+      console.warn("hideDefaultLauncher failed:", e);
+    }
+  }
+  hideDefaultLauncher();
+  const __piperLauncherObserver = new MutationObserver(hideDefaultLauncher);
+  __piperLauncherObserver.observe(document.documentElement, { childList: true, subtree: true });
+
+  // Re-hide launcher & re-show card on ESW lifecycle events
+  ["onEmbeddedMessagingReady",
+   "onEmbeddedMessagingMinimized",
+   "onEmbeddedMessagingConversationEnded",
+   "onEmbeddedMessagingClosed"
+  ].forEach((evt) => {
+    window.addEventListener(evt, () => {
+      hideDefaultLauncher();
       chatLaunched = false;
       launchPromise = null;
       showCard();

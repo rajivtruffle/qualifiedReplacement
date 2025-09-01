@@ -63,7 +63,7 @@ iframe[src*="embeddedmessaging"] {
   .lang-picker { gap: 6px; }
 }
 
-/* === Piper Card (localized) === */
+/* === Piper/Algolia AI Card (localized) === */
 :root {
   --piper-card-bg: #fff;
   --piper-text: #111;
@@ -154,7 +154,7 @@ iframe[src*="embeddedmessaging"] {
   outline-offset: 2px;
 }
 
-/* Hide Salesforce's default launcher button – we use Piper instead */
+/* Hide Salesforce's default launcher button – we use the custom card instead */
 .embeddedservice-helpbutton,
 .embeddedservice-helpbutton .helpButton,
 .embeddedMessagingLauncher,
