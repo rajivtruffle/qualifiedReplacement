@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+  <title>Truffle Media</title>
+  <link rel="icon" href="../assets/favicon.ico" />
+  <link rel="stylesheet" href="../assets/styles.css" />
+</head>
+<body>
+  <!-- Full-bleed background (image is set by app.js) -->
+  <div class="bg"></div>
+
+  <!-- Overlays -->
+  <div class="lang-picker">
+    <label for="langSelect">Langue</label>
+    <select id="langSelect" aria-label="Sélectionner la langue">
+      <option value="en">English</option>
+      <option value="fr" selected>Français</option>
+      <option value="de">Deutsch</option>
+    </select>
+  </div>
+
+  <!-- Optional caption -->
+  <div class="caption">Page française</div>
+
+  <!-- Mount point for Piper -->
+  <div id="piper-root"></div>
+
+  <!-- Your existing ESW init + background/UTM logic -->
+  <script src="../assets/app.js" defer></script>
+
+  <!-- Piper UI (launch + hide + send) -->
+  <script src="../assets/piper.js" defer></script>
+</body>
+</html>
